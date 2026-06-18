@@ -13,6 +13,7 @@ export interface ScheduledTask {
 export class SchedulerService {
   private readonly timers = new Map<string, NodeJS.Timeout>();
   private readonly tasks: ScheduledTask[] = [];
+  private started = false;
 
   public constructor(@inject(TOKENS.Logger) private readonly logger: AppLogger) {}
 
@@ -25,19 +26,21 @@ export class SchedulerService {
     }
 
     this.tasks.push(task);
+
+    if (this.started) {
+      this.startTask(task);
+    }
   }
 
   public start(): void {
-    for (const task of this.tasks) {
-      const timer = setInterval(() => {
-        void task.run().catch((error) => {
-          this.logger.error({ error, task: task.name }, 'scheduled task failed');
-        });
-      }, task.intervalMs);
+    if (this.started) {
+      return;
+    }
 
-      timer.unref();
-      this.timers.set(task.name, timer);
-      this.logger.info({ task: task.name, intervalMs: task.intervalMs }, 'scheduled task started');
+    this.started = true;
+
+    for (const task of this.tasks) {
+      this.startTask(task);
     }
 
     this.logger.info({ taskCount: this.tasks.length }, 'scheduler initialized');
@@ -49,6 +52,19 @@ export class SchedulerService {
     }
 
     this.timers.clear();
+    this.started = false;
     this.logger.info('scheduler stopped');
+  }
+
+  private startTask(task: ScheduledTask): void {
+    const timer = setInterval(() => {
+      void task.run().catch((error) => {
+        this.logger.error({ error, task: task.name }, 'scheduled task failed');
+      });
+    }, task.intervalMs);
+
+    timer.unref();
+    this.timers.set(task.name, timer);
+    this.logger.info({ task: task.name, intervalMs: task.intervalMs }, 'scheduled task started');
   }
 }

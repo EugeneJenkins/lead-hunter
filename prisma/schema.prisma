@@ -21,3 +21,15 @@ model Lead {
   @@unique([source, externalId])
   @@index([source])
 }
+
+model TelegramChatCursor {
+  chatId        String   @id
+  chatRef       String
+  title         String?
+  lastMessageId Int      @default(0)
+  lastSyncedAt  DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([chatRef])
+}

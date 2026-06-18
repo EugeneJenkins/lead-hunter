@@ -25,6 +25,16 @@ const enabledModulesFromEnv = z
       .filter(Boolean),
   );
 
+const commaSeparatedListFromEnv = z
+  .string()
+  .default('')
+  .transform((value) =>
+    value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  );
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
@@ -36,9 +46,12 @@ const envSchema = z.object({
     .default('postgresql://leadhunter:leadhunter@localhost:5432/leadhunter?schema=public'),
   ENABLED_MODULES: enabledModulesFromEnv,
   TELEGRAM_ENABLED: booleanFromEnv.default(true),
-  TELEGRAM_API_ID: z.string().optional(),
+  TELEGRAM_API_ID: z.coerce.number().int().positive().optional(),
   TELEGRAM_API_HASH: z.string().optional(),
   TELEGRAM_SESSION: z.string().optional(),
+  TELEGRAM_CHATS: commaSeparatedListFromEnv,
+  TELEGRAM_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
+  TELEGRAM_BATCH_SIZE: z.coerce.number().int().positive().max(3_000).default(100),
 });
 
 export type Environment = z.infer<typeof envSchema>;
@@ -60,9 +73,12 @@ export interface AppConfig {
     enabled: string[];
     telegram: {
       enabled: boolean;
-      apiId?: string;
+      apiId?: number;
       apiHash?: string;
       session?: string;
+      chats: string[];
+      syncIntervalMs: number;
+      batchSize: number;
     };
   };
 }
@@ -90,6 +106,9 @@ export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
         apiId: parsed.TELEGRAM_API_ID,
         apiHash: parsed.TELEGRAM_API_HASH,
         session: parsed.TELEGRAM_SESSION,
+        chats: parsed.TELEGRAM_CHATS,
+        syncIntervalMs: parsed.TELEGRAM_SYNC_INTERVAL_MS,
+        batchSize: parsed.TELEGRAM_BATCH_SIZE,
       },
     },
   };

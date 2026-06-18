@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
+    "telegram:session": "tsx scripts/generate-telegram-session.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
@@ -28,6 +29,7 @@
     "fastify": "^5.4.0",
     "pino": "^9.7.0",
     "reflect-metadata": "^0.2.2",
+    "telegram": "^2.26.22",
     "tsyringe": "^4.10.0",
     "zod": "^3.25.67"
   },
