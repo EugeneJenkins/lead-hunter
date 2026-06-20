@@ -1,18 +1,20 @@
-import { inject, injectable } from 'tsyringe';
-import { TelegramClient, type Api } from 'telegram';
-import { StringSession } from 'telegram/sessions';
+import {inject, injectable} from 'tsyringe';
+import {TelegramClient, type Api} from 'telegram';
+import {StringSession} from 'telegram/sessions';
 
-import { ConfigService } from '../../core/config/config.service';
-import type { EventBus } from '../../core/events/event-bus';
-import type { AppLogger } from '../../core/logger/logger';
-import type { SourceModule } from '../../core/modules/source-module';
-import { TOKENS } from '../../core/di/tokens';
-import { PrismaService } from '../../database/prisma.service';
-import { createSourceLeadDiscoveredEvent } from '../../lead-engine/domain/lead-events';
-import { SchedulerService } from '../../scheduler/scheduler.service';
-import { ConfigurationError } from '../../shared/errors/configuration-error';
-import type { JsonObject } from '../../shared/types/json';
-import type { TelegramModuleConfig } from './telegram.config';
+import {ConfigService} from '../../core/config/config.service';
+import type {EventBus} from '../../core/events/event-bus';
+import type {AppLogger} from '../../core/logger/logger';
+import type {SourceModule} from '../../core/modules/source-module';
+import {TOKENS} from '../../core/di/tokens';
+import {PrismaService} from '../../database/prisma.service';
+import {createSourceLeadDiscoveredEvent} from '../../lead-engine/domain/lead-events';
+import {SchedulerService} from '../../scheduler/scheduler.service';
+import {ConfigurationError} from '../../shared/errors/configuration-error';
+import type {JsonObject} from '../../shared/types/json';
+import type {TelegramModuleConfig} from './telegram.config';
+import {PrismaPromise} from "@prisma/client";
+import {TelegramChatCursor} from "./interfaces/telegram-chat-cursor.interface";
 
 type TelegramHistoryMessage = Api.Message | Api.MessageService;
 type TelegramChatRef = string | number;
@@ -37,7 +39,6 @@ export class TelegramSourceModule implements SourceModule {
   }
 
   public async start(): Promise<void> {
-    //todo перепроверить
     if (!this.config.apiId || !this.config.apiHash || !this.config.session) {
       this.logger.warn(
         {
@@ -51,11 +52,10 @@ export class TelegramSourceModule implements SourceModule {
       return;
     }
 
-    if (this.config.chats.length === 0) {
-      this.logger.warn(
-        { module: this.name },
-        'telegram module skipped because no chats configured',
-      );
+    const chats = await this.getAllChats();
+
+    if (chats.length === 0) {
+      this.logger.warn({module: this.name}, 'telegram module skipped because no chats configured');
       return;
     }
 
@@ -78,7 +78,7 @@ export class TelegramSourceModule implements SourceModule {
     this.scheduler.register({
       name: 'telegram.sync',
       intervalMs: this.config.syncIntervalMs,
-      run: () => this.syncConfiguredChats(),
+      run: () => this.syncConfiguredChats(chats),
     });
 
     this.logger.info(
@@ -90,7 +90,7 @@ export class TelegramSourceModule implements SourceModule {
       'telegram module initialized',
     );
 
-    await this.syncConfiguredChats();
+    await this.syncConfiguredChats(chats);
   }
 
   public async stop(): Promise<void> {
@@ -101,15 +101,12 @@ export class TelegramSourceModule implements SourceModule {
     }
 
     this.client = undefined;
-    this.logger.info({ module: this.name }, 'telegram module stopped');
+    this.logger.info({module: this.name}, 'telegram module stopped');
   }
 
-  private async syncConfiguredChats(): Promise<void> {
+  private async syncConfiguredChats(chats: TelegramChatCursor[]): Promise<void> {
     if (this.syncRunning) {
-      this.logger.warn(
-        { module: this.name },
-        'telegram sync skipped because previous run is active',
-      );
+      this.logger.warn({module: this.name}, 'telegram sync skipped because previous run is active');
       return;
     }
 
@@ -120,15 +117,15 @@ export class TelegramSourceModule implements SourceModule {
     this.syncRunning = true;
 
     try {
-      for (const chatRef of this.config.chats) {
+      for (const chat of chats) {
         if (this.stopped) {
           return;
         }
 
         try {
-          await this.syncChat(chatRef);
+          await this.syncChat(chat);
         } catch (error) {
-          this.logger.error({ error, module: this.name, chatRef }, 'telegram chat sync failed');
+          this.logger.error({error, module: this.name, chatTitle: chat.title}, 'telegram chat sync failed');
         }
       }
     } finally {
@@ -136,25 +133,15 @@ export class TelegramSourceModule implements SourceModule {
     }
   }
 
-  private async syncChat(chatRef: string): Promise<void> {
+  private async syncChat(chat: TelegramChatCursor): Promise<void> {
     const client = this.requireClient();
-    const entity = await client.getEntity(this.parseChatRef(chatRef));
+    const entity = await client.getEntity(this.parseChatRef(chat.chatRef));
     const chatId = await client.getPeerId(entity);
     const title = this.getEntityTitle(entity);
 
-    const cursor = await this.prismaService.client.telegramChatCursor.upsert({
-      where: { chatId },
-      create: {
-        chatId,
-        chatRef,
-        title,
-      },
-      update: {
-        chatRef,
-        title,
-        lastSyncedAt: new Date(),
-      },
-    });
+    if (!chat.chatId){
+      this.updateChatInfo()
+    }
 
     let processedCount = 0;
     let failedCount = 0;
@@ -237,7 +224,7 @@ export class TelegramSourceModule implements SourceModule {
 
   private async updateCursor(chatId: string, lastMessageId: number): Promise<void> {
     await this.prismaService.client.telegramChatCursor.update({
-      where: { chatId },
+      where: {chatId},
       data: {
         lastMessageId,
         lastSyncedAt: new Date(),
@@ -367,7 +354,7 @@ export class TelegramSourceModule implements SourceModule {
 
   private getErrorDetails(error: unknown): Record<string, unknown> {
     if (!error || typeof error !== 'object') {
-      return { error };
+      return {error};
     }
 
     const maybeError = error as {
@@ -387,5 +374,34 @@ export class TelegramSourceModule implements SourceModule {
       prismaClientVersion: maybeError.clientVersion,
       errorStack: maybeError.stack,
     };
+  }
+
+  private getAllChats(): PrismaPromise<TelegramChatCursor[]> {
+    return this.prismaService.client.telegramChatCursor.findMany({
+      where: {
+        enabled: true,
+      },
+      select: {
+        id: true,
+        chatId: true,
+        chatRef: true,
+        title: true,
+        lastMessageId: true,
+        lastSyncedAt: true,
+        enabled: true
+      },
+    });
+  }
+
+  private updateChatInfo(id: number, chatId: string, title: string): void
+  {
+    const cursor = await this.prismaService.client.telegramChatCursor.update({
+      where: {id: id},
+      data: {
+        chatId,
+        title,
+        lastSyncedAt: new Date(),
+      },
+    });
   }
 }
