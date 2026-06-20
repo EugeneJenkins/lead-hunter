@@ -1,20 +1,20 @@
-import {inject, injectable} from 'tsyringe';
-import {TelegramClient, type Api} from 'telegram';
-import {StringSession} from 'telegram/sessions';
+import { inject, injectable } from 'tsyringe';
+import { TelegramClient, type Api } from 'telegram';
+import { StringSession } from 'telegram/sessions';
 
-import {ConfigService} from '../../core/config/config.service';
-import type {EventBus} from '../../core/events/event-bus';
-import type {AppLogger} from '../../core/logger/logger';
-import type {SourceModule} from '../../core/modules/source-module';
-import {TOKENS} from '../../core/di/tokens';
-import {PrismaService} from '../../database/prisma.service';
-import {createSourceLeadDiscoveredEvent} from '../../lead-engine/domain/lead-events';
-import {SchedulerService} from '../../scheduler/scheduler.service';
-import {ConfigurationError} from '../../shared/errors/configuration-error';
-import type {JsonObject} from '../../shared/types/json';
-import type {TelegramModuleConfig} from './telegram.config';
-import {PrismaPromise} from "@prisma/client";
-import {TelegramChatCursor} from "./interfaces/telegram-chat-cursor.interface";
+import { ConfigService } from '../../core/config/config.service';
+import type { EventBus } from '../../core/events/event-bus';
+import type { AppLogger } from '../../core/logger/logger';
+import type { SourceModule } from '../../core/modules/source-module';
+import { TOKENS } from '../../core/di/tokens';
+import { PrismaService } from '../../database/prisma.service';
+import { createSourceLeadDiscoveredEvent } from '../../lead-engine/domain/lead-events';
+import { SchedulerService } from '../../scheduler/scheduler.service';
+import { ConfigurationError } from '../../shared/errors/configuration-error';
+import type { JsonObject } from '../../shared/types/json';
+import type { TelegramModuleConfig } from './telegram.config';
+import { PrismaPromise } from '@prisma/client';
+import { TelegramChatCursor } from './interfaces/telegram-chat-cursor.interface';
 
 type TelegramHistoryMessage = Api.Message | Api.MessageService;
 type TelegramChatRef = string | number;
@@ -55,7 +55,10 @@ export class TelegramSourceModule implements SourceModule {
     const chats = await this.getAllChats();
 
     if (chats.length === 0) {
-      this.logger.warn({module: this.name}, 'telegram module skipped because no chats configured');
+      this.logger.warn(
+        { module: this.name },
+        'telegram module skipped because no chats configured',
+      );
       return;
     }
 
@@ -101,12 +104,15 @@ export class TelegramSourceModule implements SourceModule {
     }
 
     this.client = undefined;
-    this.logger.info({module: this.name}, 'telegram module stopped');
+    this.logger.info({ module: this.name }, 'telegram module stopped');
   }
 
   private async syncConfiguredChats(chats: TelegramChatCursor[]): Promise<void> {
     if (this.syncRunning) {
-      this.logger.warn({module: this.name}, 'telegram sync skipped because previous run is active');
+      this.logger.warn(
+        { module: this.name },
+        'telegram sync skipped because previous run is active',
+      );
       return;
     }
 
@@ -125,7 +131,10 @@ export class TelegramSourceModule implements SourceModule {
         try {
           await this.syncChat(chat);
         } catch (error) {
-          this.logger.error({error, module: this.name, chatTitle: chat.title}, 'telegram chat sync failed');
+          this.logger.error(
+            { error, module: this.name, chatTitle: chat.title },
+            'telegram chat sync failed',
+          );
         }
       }
     } finally {
@@ -139,39 +148,46 @@ export class TelegramSourceModule implements SourceModule {
     const chatId = await client.getPeerId(entity);
     const title = this.getEntityTitle(entity);
 
-    if (!chat.chatId){
-      this.updateChatInfo()
+    if (!chat.chatId) {
+      await this.updateChatInfo(chat.id, chatId, title ?? '');
     }
 
-    let processedCount = 0;
+    const processedCount = 0;
     let failedCount = 0;
-    let highestMessageId = cursor.lastMessageId;
+    let lastMassageId = chat.lastMessageId;
 
-    for await (const message of client.iterMessages(entity, {
-      minId: cursor.lastMessageId,
-      reverse: true,
-      waitTime: 1,
-    })) {
+    const filters: { limit?: number; reverse: boolean; offsetId?: number } = {
+      limit: 1,
+      reverse: false,
+    };
+
+    if (chat.lastMessageId !== 0) {
+      filters.reverse = true;
+      filters.offsetId = chat.lastMessageId;
+      delete filters.limit;
+    }
+
+    // Get the last message in the chat
+    for await (const message of client.iterMessages(entity, filters)) {
       if (this.stopped) {
         break;
       }
 
-      if (!this.isHistoryMessage(message)) {
-        continue;
+      //break if there are no messages
+      if (message.id === chat.lastMessageId) {
+        break;
       }
 
-      highestMessageId = Math.max(highestMessageId, message.id);
-
       try {
-        await this.publishMessage(chatRef, chatId, title, message);
-        processedCount += 1;
+        await this.publishMessage(chat.chatRef, chatId, title, message);
+        lastMassageId = message.id;
       } catch (error) {
         failedCount += 1;
         this.logger.error(
           {
             ...this.getErrorDetails(error),
             module: this.name,
-            chatRef,
+            chatRef: chat.chatRef,
             chatId,
             messageId: message.id,
             textLength: message.message?.length ?? 0,
@@ -183,19 +199,23 @@ export class TelegramSourceModule implements SourceModule {
       }
 
       if (processedCount % this.config.batchSize === 0) {
-        await this.updateCursor(chatId, highestMessageId);
+        await this.updateCursor(chat.id, message.id);
+      }
+
+      if (chat.lastMessageId == 0) {
+        break;
       }
     }
 
-    await this.updateCursor(chatId, highestMessageId);
+    await this.updateCursor(chat.id, lastMassageId);
     this.logger.info(
       {
         module: this.name,
-        chatRef,
+        chatRef: chat.chatRef,
         chatId,
         processedCount,
         failedCount,
-        lastMessageId: highestMessageId,
+        lastMessageId: lastMassageId,
       },
       'telegram chat synced',
     );
@@ -222,9 +242,9 @@ export class TelegramSourceModule implements SourceModule {
     );
   }
 
-  private async updateCursor(chatId: string, lastMessageId: number): Promise<void> {
+  private async updateCursor(id: number, lastMessageId: number): Promise<void> {
     await this.prismaService.client.telegramChatCursor.update({
-      where: {chatId},
+      where: { id },
       data: {
         lastMessageId,
         lastSyncedAt: new Date(),
@@ -327,15 +347,6 @@ export class TelegramSourceModule implements SourceModule {
     return undefined;
   }
 
-  private isHistoryMessage(message: unknown): message is TelegramHistoryMessage {
-    return (
-      message !== null &&
-      typeof message === 'object' &&
-      'id' in message &&
-      typeof (message as { id?: unknown }).id === 'number'
-    );
-  }
-
   private requireClient(): TelegramClient {
     if (!this.client) {
       throw new Error('Telegram client is not initialized');
@@ -354,7 +365,7 @@ export class TelegramSourceModule implements SourceModule {
 
   private getErrorDetails(error: unknown): Record<string, unknown> {
     if (!error || typeof error !== 'object') {
-      return {error};
+      return { error };
     }
 
     const maybeError = error as {
@@ -388,15 +399,14 @@ export class TelegramSourceModule implements SourceModule {
         title: true,
         lastMessageId: true,
         lastSyncedAt: true,
-        enabled: true
+        enabled: true,
       },
     });
   }
 
-  private updateChatInfo(id: number, chatId: string, title: string): void
-  {
-    const cursor = await this.prismaService.client.telegramChatCursor.update({
-      where: {id: id},
+  private async updateChatInfo(id: number, chatId: string, title: string): Promise<void> {
+    await this.prismaService.client.telegramChatCursor.update({
+      where: { id: id },
       data: {
         chatId,
         title,

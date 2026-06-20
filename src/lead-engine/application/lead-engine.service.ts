@@ -4,7 +4,7 @@ import { TOKENS } from '../../core/di/tokens';
 import type { EventBus } from '../../core/events/event-bus';
 import type { AppLogger } from '../../core/logger/logger';
 import {
-  createLeadFoundEvent,
+  // createLeadFoundEvent,
   SOURCE_LEAD_DISCOVERED,
   type SourceLeadDiscoveredEvent,
 } from '../domain/lead-events';
@@ -43,7 +43,7 @@ export class LeadEngineService {
       rawPayload: event.payload.rawPayload,
     });
 
-    await this.eventBus.publish(createLeadFoundEvent(lead));
+    // await this.eventBus.publish(createLeadFoundEvent(lead));
     this.logger.info({ leadId: lead.id, source: lead.source }, 'lead processed');
   }
 }

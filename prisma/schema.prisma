@@ -22,11 +22,13 @@ model Lead {
 }
 
 model TelegramChatCursor {
-  chatId        String   @id
+  id            Int      @id @default(autoincrement())
+  chatId        String?  @unique
   chatRef       String
   title         String?
   lastMessageId Int      @default(0)
   lastSyncedAt  DateTime @default(now())
+  enabled       Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
