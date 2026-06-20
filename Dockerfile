@@ -8,6 +8,7 @@ RUN npm install
 
 FROM deps AS build
 COPY tsconfig.json ./
+COPY prisma.config.ts ./
 COPY prisma ./prisma
 COPY src ./src
 RUN npm run prisma:generate
@@ -20,6 +21,7 @@ RUN apt-get update \
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY package*.json ./
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

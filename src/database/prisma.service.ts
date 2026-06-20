@@ -1,6 +1,8 @@
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { inject, injectable } from 'tsyringe';
 
+import { ConfigService } from '../core/config/config.service';
 import { TOKENS } from '../core/di/tokens';
 import type { AppLogger } from '../core/logger/logger';
 
@@ -8,8 +10,12 @@ import type { AppLogger } from '../core/logger/logger';
 export class PrismaService {
   public readonly client: PrismaClient;
 
-  public constructor(@inject(TOKENS.Logger) private readonly logger: AppLogger) {
-    this.client = new PrismaClient();
+  public constructor(
+    @inject(TOKENS.ConfigService) configService: ConfigService,
+    @inject(TOKENS.Logger) private readonly logger: AppLogger,
+  ) {
+    const adapter = new PrismaPg(configService.config.database.url);
+    this.client = new PrismaClient({ adapter });
   }
 
   public async connect(): Promise<void> {
