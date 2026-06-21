@@ -394,9 +394,9 @@ export class TelegramSourceModule implements SourceModule {
       },
       select: {
         id: true,
+        title: true,
         chatId: true,
         chatRef: true,
-        title: true,
         lastMessageId: true,
         lastSyncedAt: true,
         enabled: true,
