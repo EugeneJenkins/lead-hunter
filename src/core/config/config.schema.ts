@@ -52,6 +52,7 @@ const envSchema = z.object({
   TELEGRAM_CHATS: commaSeparatedListFromEnv,
   TELEGRAM_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
   TELEGRAM_BATCH_SIZE: z.coerce.number().int().positive().max(3_000).default(100),
+  WORKER_CONCURRENCY: z.coerce.number().int().positive().default(1),
 });
 
 export type Environment = z.infer<typeof envSchema>;
@@ -80,6 +81,9 @@ export interface AppConfig {
       syncIntervalMs: number;
       batchSize: number;
     };
+  };
+  workers: {
+    concurrency: number;
   };
 }
 
@@ -110,6 +114,9 @@ export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
         syncIntervalMs: parsed.TELEGRAM_SYNC_INTERVAL_MS,
         batchSize: parsed.TELEGRAM_BATCH_SIZE,
       },
+    },
+    workers: {
+      concurrency: parsed.WORKER_CONCURRENCY,
     },
   };
 }

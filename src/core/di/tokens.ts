@@ -8,4 +8,13 @@ export const TOKENS = {
   LeadEngine: Symbol.for('LeadEngine'),
   Scheduler: Symbol.for('Scheduler'),
   ModuleRegistry: Symbol.for('ModuleRegistry'),
+
+  // Worker
+  WorkerBootstrap: Symbol.for('WorkerBootstrap'),
+  Worker: Symbol.for('Worker'),
+  JobDispatcher: Symbol.for('JobDispatcher'),
+  QueueService: Symbol.for('QueueService'),
+  ProcessorRegistry: Symbol.for('ProcessorRegistry'),
+  ProcessorRegistration: Symbol.for('ProcessorRegistration'),
+  CheckIsLead: Symbol.for('CheckIsLead'),
 } as const;

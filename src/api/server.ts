@@ -18,6 +18,7 @@ export function createFastifyApplication(container: DependencyContainer): Applic
   const prismaService = container.resolve<PrismaService>(TOKENS.PrismaService);
   const moduleRegistry = container.resolve<ModuleRegistry>(TOKENS.ModuleRegistry);
   const scheduler = container.resolve<SchedulerService>(TOKENS.Scheduler);
+  const worker = container.resolve<SchedulerService>(TOKENS.WorkerBootstrap);
   const leadEngine = container.resolve<LeadEngineService>(TOKENS.LeadEngine);
 
   const server = fastify({
@@ -35,6 +36,7 @@ export function createFastifyApplication(container: DependencyContainer): Applic
       await prismaService.connect();
       leadEngine.start();
       scheduler.start();
+      worker.start();
       await moduleRegistry.startEnabledModules();
 
       await server.listen({

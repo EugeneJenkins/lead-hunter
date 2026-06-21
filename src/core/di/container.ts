@@ -10,6 +10,13 @@ import { InMemoryEventBus } from '../events/in-memory-event-bus';
 import { createLogger } from '../logger/logger';
 import { ModuleRegistry } from '../modules/module-registry';
 import { TOKENS } from './tokens';
+import { WorkerBootstrap } from '../../queue/worker-bootstrap';
+import { JobDispatcher } from '../../queue/job-dispatcher';
+import { QueueService } from '../../queue/queue.service';
+import { Worker } from '../../queue/worker';
+import { ProcessorRegistry } from '../../queue/processor-registry';
+import { CheckIsLead } from '../../queue/job-processors/check-is-lead';
+import { ProcessorRegistration } from '../../queue/processor-registration';
 
 export function buildContainer(): DependencyContainer {
   const appContainer = container.createChildContainer();
@@ -25,6 +32,15 @@ export function buildContainer(): DependencyContainer {
   appContainer.registerSingleton(TOKENS.LeadRepository, PrismaLeadRepository);
   appContainer.registerSingleton(TOKENS.LeadEngine, LeadEngineService);
   appContainer.registerSingleton(TOKENS.Scheduler, SchedulerService);
+
+  appContainer.registerSingleton(TOKENS.WorkerBootstrap, WorkerBootstrap);
+  appContainer.registerSingleton(TOKENS.Worker, Worker);
+  appContainer.registerSingleton(TOKENS.JobDispatcher, JobDispatcher);
+  appContainer.registerSingleton(TOKENS.QueueService, QueueService);
+  appContainer.registerSingleton(TOKENS.ProcessorRegistry, ProcessorRegistry);
+  appContainer.registerSingleton(TOKENS.ProcessorRegistration, ProcessorRegistration);
+  appContainer.registerSingleton(TOKENS.CheckIsLead, CheckIsLead);
+
   appContainer.registerInstance(
     TOKENS.ModuleRegistry,
     new ModuleRegistry(configService, logger, appContainer),

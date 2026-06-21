@@ -34,3 +34,31 @@ model TelegramChatCursor {
 
   @@index([chatRef])
 }
+
+model Job {
+  id          String    @id @default(uuid()) @db.Uuid
+  type        String
+  priority    Int       @default(0)
+  payload     Json      @db.Json
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  runAt       DateTime?
+  lockedAt    DateTime?
+  lockedBy    String?
+  completedAt DateTime?
+  failedAt    DateTime?
+  lastError   Json?     @db.Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([lockedAt, lockedBy], name: "idx_job_locked")
+  @@index([status, runAt])
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}

@@ -9,6 +9,8 @@ import {
   type SourceLeadDiscoveredEvent,
 } from '../domain/lead-events';
 import type { LeadRepository } from '../domain/lead.repository';
+import { JobDispatcher } from '../../queue/job-dispatcher';
+import { JobType } from '../../queue/job-type';
 
 @injectable()
 export class LeadEngineService {
@@ -18,6 +20,7 @@ export class LeadEngineService {
     @inject(TOKENS.EventBus) private readonly eventBus: EventBus,
     @inject(TOKENS.LeadRepository) private readonly leadRepository: LeadRepository,
     @inject(TOKENS.Logger) private readonly logger: AppLogger,
+    @inject(TOKENS.JobDispatcher) private readonly dispatcher: JobDispatcher,
   ) {}
 
   public start(): void {
@@ -42,6 +45,14 @@ export class LeadEngineService {
       url: event.payload.url,
       rawPayload: event.payload.rawPayload,
     });
+
+    await this.dispatcher.dispatch(
+      JobType.CheckIsLead,
+      {
+        lead,
+      },
+      1,
+    );
 
     // await this.eventBus.publish(createLeadFoundEvent(lead));
     this.logger.info({ leadId: lead.id, source: lead.source }, 'lead processed');
