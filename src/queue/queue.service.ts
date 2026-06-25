@@ -31,15 +31,9 @@ export class QueueService {
   }
 
   async markCompleted(jobId: string): Promise<void> {
-    await this.prisma.client.job.update({
+    await this.prisma.client.job.delete({
       where: {
         id: jobId,
-      },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        lockedAt: null,
-        lockedBy: null,
       },
     });
   }

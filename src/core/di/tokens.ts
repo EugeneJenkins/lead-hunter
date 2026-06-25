@@ -17,4 +17,6 @@ export const TOKENS = {
   ProcessorRegistry: Symbol.for('ProcessorRegistry'),
   ProcessorRegistration: Symbol.for('ProcessorRegistration'),
   CheckIsLead: Symbol.for('CheckIsLead'),
+
+  OllamaFilter: Symbol.for('OllamaFilter'),
 } as const;

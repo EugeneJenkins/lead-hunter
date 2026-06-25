@@ -53,6 +53,9 @@ const envSchema = z.object({
   TELEGRAM_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
   TELEGRAM_BATCH_SIZE: z.coerce.number().int().positive().max(3_000).default(100),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(1),
+  OLLAMA_MODEL_NAME: z.string().default('qwen2.5:1.5b'),
+  OLLAMA_LEAD_CLASSIFIER_PROMPT: z.string().default('You are a helpful assistant.'),
+  OLLAMA_URL: z.string().url().default('http://127.0.0.1:11434'),
 });
 
 export type Environment = z.infer<typeof envSchema>;
@@ -84,6 +87,11 @@ export interface AppConfig {
   };
   workers: {
     concurrency: number;
+  };
+  ollama: {
+    host: string;
+    prompt: string;
+    model: string;
   };
 }
 
@@ -117,6 +125,11 @@ export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
     },
     workers: {
       concurrency: parsed.WORKER_CONCURRENCY,
+    },
+    ollama: {
+      host: parsed.OLLAMA_URL,
+      prompt: parsed.OLLAMA_LEAD_CLASSIFIER_PROMPT,
+      model: parsed.OLLAMA_MODEL_NAME,
     },
   };
 }

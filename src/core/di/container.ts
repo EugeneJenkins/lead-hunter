@@ -17,6 +17,7 @@ import { Worker } from '../../queue/worker';
 import { ProcessorRegistry } from '../../queue/processor-registry';
 import { CheckIsLead } from '../../queue/job-processors/check-is-lead';
 import { ProcessorRegistration } from '../../queue/processor-registration';
+import { OllamaFilter } from '../../lead-engine/ai-chat/ollama-filter';
 
 export function buildContainer(): DependencyContainer {
   const appContainer = container.createChildContainer();
@@ -40,6 +41,7 @@ export function buildContainer(): DependencyContainer {
   appContainer.registerSingleton(TOKENS.ProcessorRegistry, ProcessorRegistry);
   appContainer.registerSingleton(TOKENS.ProcessorRegistration, ProcessorRegistration);
   appContainer.registerSingleton(TOKENS.CheckIsLead, CheckIsLead);
+  appContainer.registerSingleton(TOKENS.OllamaFilter, OllamaFilter);
 
   appContainer.registerInstance(
     TOKENS.ModuleRegistry,
