@@ -2,6 +2,7 @@ import { inject, injectable } from 'tsyringe';
 import { TOKENS } from '../core/di/tokens';
 import { PrismaService } from '../database/prisma.service';
 import type { AppLogger } from '../core/logger/logger';
+import type { JsonObject } from '../shared/types/json';
 
 @injectable()
 export class JobDispatcher {
@@ -10,11 +11,10 @@ export class JobDispatcher {
     @inject(TOKENS.Logger) private readonly logger: AppLogger,
   ) {}
 
-  async dispatch(type: string, payload: object, priority: number): Promise<void> {
+  async dispatch(type: string, payload: JsonObject, priority: number): Promise<void> {
     this.logger.debug({
       info: 'New job dispatched',
       type,
-      payload,
       priority,
     });
 

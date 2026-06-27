@@ -11,6 +11,7 @@ import {
 import type { LeadRepository } from '../domain/lead.repository';
 import { JobDispatcher } from '../../queue/job-dispatcher';
 import { JobType } from '../../queue/job-type';
+import type { JsonObject } from '../../shared/types/json';
 
 @injectable()
 export class LeadEngineService {
@@ -49,12 +50,26 @@ export class LeadEngineService {
     await this.dispatcher.dispatch(
       JobType.CheckIsLead,
       {
-        lead,
+        lead: this.createLeadJobPayload(lead),
       },
       1,
     );
 
     // await this.eventBus.publish(createLeadFoundEvent(lead));
     this.logger.info({ leadId: lead.id, source: lead.source }, 'lead processed');
+  }
+
+  private createLeadJobPayload(lead: Awaited<ReturnType<LeadRepository['upsert']>>): JsonObject {
+    return {
+      id: lead.id ?? null,
+      source: lead.source,
+      externalId: lead.externalId ?? null,
+      title: lead.title,
+      description: lead.description ?? null,
+      url: lead.url ?? null,
+      rawPayload: lead.rawPayload ?? null,
+      createdAt: lead.createdAt?.toISOString() ?? null,
+      updatedAt: lead.updatedAt?.toISOString() ?? null,
+    };
   }
 }

@@ -1,5 +1,6 @@
 import { injectable } from 'tsyringe';
 import { JobProcessor } from './job-processor';
+import type { JsonValue } from '../shared/types/json';
 
 @injectable()
 export class ProcessorRegistry {
@@ -9,8 +10,7 @@ export class ProcessorRegistry {
     this.processors.set(processor.type, processor);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async processJob(jobId: string, type: string, payload: any): Promise<void> {
+  async processJob(jobId: string, type: string, payload: JsonValue): Promise<void> {
     await this.get(type).process(jobId, payload);
   }
 

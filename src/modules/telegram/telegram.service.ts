@@ -152,9 +152,9 @@ export class TelegramSourceModule implements SourceModule {
       await this.updateChatInfo(chat.id, chatId, title ?? '');
     }
 
-    const processedCount = 0;
+    let processedCount = 0;
     let failedCount = 0;
-    let lastMassageId = chat.lastMessageId;
+    let lastMessageId = chat.lastMessageId;
 
     const filters: { limit?: number; reverse: boolean; offsetId?: number } = {
       limit: 1,
@@ -180,7 +180,8 @@ export class TelegramSourceModule implements SourceModule {
 
       try {
         await this.publishMessage(chat.chatRef, chatId, title, message);
-        lastMassageId = message.id;
+        lastMessageId = message.id;
+        processedCount += 1;
       } catch (error) {
         failedCount += 1;
         this.logger.error(
@@ -196,10 +197,11 @@ export class TelegramSourceModule implements SourceModule {
           },
           'telegram message processing failed',
         );
+        break;
       }
 
       if (processedCount % this.config.batchSize === 0) {
-        await this.updateCursor(chat.id, message.id);
+        await this.updateCursor(chat.id, lastMessageId);
       }
 
       if (chat.lastMessageId == 0) {
@@ -207,7 +209,7 @@ export class TelegramSourceModule implements SourceModule {
       }
     }
 
-    await this.updateCursor(chat.id, lastMassageId);
+    await this.updateCursor(chat.id, lastMessageId);
     this.logger.info(
       {
         module: this.name,
@@ -215,7 +217,7 @@ export class TelegramSourceModule implements SourceModule {
         chatId,
         processedCount,
         failedCount,
-        lastMessageId: lastMassageId,
+        lastMessageId,
       },
       'telegram chat synced',
     );

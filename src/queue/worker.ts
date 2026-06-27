@@ -3,8 +3,9 @@ import { QueueService } from './queue.service';
 import { inject, injectable } from 'tsyringe';
 import { randomUUID } from 'crypto';
 import { TOKENS } from '../core/di/tokens';
-import { Job } from '@prisma/client';
+import { type Job } from '@prisma/client';
 import { AppLogger } from '../core/logger/logger';
+import type { JsonValue } from '../shared/types/json';
 
 @injectable()
 export class Worker {
@@ -20,13 +21,13 @@ export class Worker {
   async poll(concurrency: number): Promise<void> {
     const jobs = await this.queueService.lockNextJobs(this.workerId, concurrency);
 
-    this.logger.debug({
-      message: 'test',
-      jobs,
-    });
+    this.logger.debug({ workerId: this.workerId, jobCount: jobs.length }, 'jobs locked');
 
     for (const job of jobs) {
-      this.logger.debug('Starting process job: ' + job.id);
+      this.logger.debug(
+        { workerId: this.workerId, jobId: job.id, jobType: job.type },
+        'starting job',
+      );
 
       await this.processJob(job);
     }
@@ -34,9 +35,21 @@ export class Worker {
 
   async processJob(job: Job): Promise<void> {
     try {
-      await this.processorRegistry.processJob(job.id, job.type, job.payload);
+      await this.processorRegistry.processJob(job.id, job.type, job.payload as JsonValue);
       await this.queueService.markCompleted(job.id);
     } catch (error) {
+      this.logger.error(
+        {
+          error,
+          workerId: this.workerId,
+          jobId: job.id,
+          jobType: job.type,
+          attempts: job.attempts,
+          maxAttempts: job.maxAttempts,
+          stage: 'job-processing',
+        },
+        'job failed',
+      );
       await this.queueService.markFailed(job, error);
     }
   }
